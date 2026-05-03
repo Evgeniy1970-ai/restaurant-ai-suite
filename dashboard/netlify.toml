@@ -1,0 +1,22 @@
+# Netlify configuration for Restaurant AI Suite Dashboard
+
+[build]
+  publish = "."
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://*.ngrok-free.dev; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://*.ngrok-free.dev https://*.ngrok.io;"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+[[redirects]]
+  from = "/n8n/*"
+  to = "https://thomasine-zincous-convocationally.ngrok-free.dev/:splat"
+  status = 200
+  force = true
