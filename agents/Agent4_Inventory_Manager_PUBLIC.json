@@ -1,0 +1,554 @@
+{
+  "name": "Agent 4 — Inventory Manager",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -320,
+        32
+      ],
+      "id": "a455440a-8eb2-45cf-ae01-3ea5531c64ce",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "path": "inventory",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -320,
+        -144
+      ],
+      "id": "1a589802-4408-4448-b085-24f10434b567",
+      "name": "Manual Trigger",
+      "webhookId": "f01d43d8-1b7f-4e04-affa-3d8f820cc38c"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -32,
+        -48
+      ],
+      "id": "11251a88-e944-44d4-9665-d0661590418e",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "inventory",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "restaurant_id",
+              "condition": "eq",
+              "keyValue": "e12f1eae-f48d-4c5f-ac9b-b9fd0f84e754"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        176,
+        -48
+      ],
+      "id": "eb453db2-7486-4441-8645-51c330fec8e0",
+      "name": "Get Inventory Data",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "restaurant-ai-suite"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst inventoryList = items.map(item => {\n  const d = item.json;\n  const daysLeft = d.daily_usage > 0 ? (d.quantity / d.daily_usage).toFixed(1) : 'N/A';\n  const status = d.quantity <= d.threshold ? '⚠️ LOW' : '✅ OK';\n  return `- ${d.ingredient}: ${d.quantity} ${d.unit} (threshold: ${d.threshold}, daily use: ${d.daily_usage}, days left: ${daysLeft}) [${status}]`;\n}).join('\\n');\n\nconst prompt = `You are an inventory manager for a restaurant. Analyze the current stock and provide:\n1. List of items that need restocking (quantity <= threshold)\n2. Recommended order quantity for each low item (enough for 7 days)\n3. Brief overall assessment\n\nCurrent inventory:\n${inventoryList}\n\nRespond in JSON format:\n{\n  \"alerts\": [{\"ingredient\": \"...\", \"current\": 0, \"threshold\": 0, \"order_qty\": 0, \"unit\": \"...\"}],\n  \"ok_items\": [\"...\"],\n  \"assessment\": \"...\",\n  \"has_alerts\": true/false\n}`;\n\nreturn [{ json: { prompt, inventory_snapshot: inventoryList } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        -48
+      ],
+      "id": "c456b2e1-a958-413d-8090-a2f53c6ca6c5",
+      "name": "Prepare AI Prompt"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "=user",
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        592,
+        -48
+      ],
+      "id": "d99c7724-f1c5-4b03-8866-d8f06a1fee93",
+      "name": "AI Inventory Analysis",
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6a5545bc-035b-4d2c-aad4-d2369793bb4d",
+              "leftValue": "={{ $json.has_alerts }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1232,
+        -32
+      ],
+      "id": "651ab410-a473-40b3-bb9a-32666ddbbc0d",
+      "name": "Has Alerts?"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🚨 Inventory Alert — Demo Restaurant\n\n{{ $json.alerts.map(a => '⚠️ ' + a.ingredient + ': ' + a.current + ' ' + a.unit + ' (min: ' + a.threshold + ') → order ' + a.order_qty + ' ' + a.unit).join('\\n') }}\n\n📊 Assessment:\n{{ $json.assessment }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1472,
+        -144
+      ],
+      "id": "4aeba211-0c3e-4cbe-a2fe-2ded9df4bef6",
+      "name": "Inventory Alert",
+      "webhookId": "4d053af1-18bc-4bbd-ad08-d9ceb91501d0",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "restaurant_neolith_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "agent_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "restaurant_id",
+              "fieldValue": "={{ 'e12f1eae-f48d-4c5f-ac9b-b9fd0f84e754' }}"
+            },
+            {
+              "fieldId": "agent_name",
+              "fieldValue": "={{ 'inventory-agent' }}"
+            },
+            {
+              "fieldId": "action",
+              "fieldValue": "={{ 'inventory_check' }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.has_alerts ? 'warning' : 'success' }}"
+            },
+            {
+              "fieldId": "payload",
+              "fieldValue": "={{ JSON.stringify($json) }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        -144
+      ],
+      "id": "d6af9640-d46e-411c-9487-a8e9348cc2dd",
+      "name": "Save to Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "restaurant-ai-suite"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "agent_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "restaurant_id",
+              "fieldValue": "={{ 'e12f1eae-f48d-4c5f-ac9b-b9fd0f84e754' }}"
+            },
+            {
+              "fieldId": "agent_name",
+              "fieldValue": "={{ 'inventory-agent' }}"
+            },
+            {
+              "fieldId": "action",
+              "fieldValue": "={{ 'inventory_check' }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ 'success' }}"
+            },
+            {
+              "fieldId": "payload",
+              "fieldValue": "={{ JSON.stringify($json) }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        48
+      ],
+      "id": "fface18b-64ca-4a13-b6ac-1cb59d0084bd",
+      "name": "Save OK Log",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "restaurant-ai-suite"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst raw = response.output[0].content[0].text;\n\nconst cleaned = raw.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n  parsed.parse_error = false;\n} catch(e) {\n  parsed = {\n    alerts: [],\n    ok_items: [],\n    assessment: \"Failed to parse AI response: \" + e.message,\n    has_alerts: false,\n    parse_error: true\n  };\n}\n\nreturn [{ json: parsed }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        -48
+      ],
+      "id": "57c4954f-504e-47db-bd3c-06bbd9a27dbb",
+      "name": "Parse AI Response"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=✅ Inventory Check — All Good\n\nAll stock levels are within normal range.\n\n{{ $json.assessment }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1472,
+        48
+      ],
+      "id": "9198dbd2-f650-409e-af3a-63b104aa3777",
+      "name": "All OK Alert",
+      "webhookId": "259ce18b-518a-41a9-a510-a162afbedf7b",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "restaurant_neolith_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "inventory",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "checked_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        368,
+        176
+      ],
+      "id": "6f7a3b47-8b6e-4fb8-9e00-81222de2a06a",
+      "name": "Update checked_at",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "restaurant-ai-suite"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e6e7084d-6ca9-445d-a392-0242a790c072",
+              "leftValue": "=$json.parse_error",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1008,
+        -48
+      ],
+      "id": "a2725cca-92af-4082-b8cf-8ba6c4dee384",
+      "name": "Parse Error?"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=❌ Inventory Agent — Parse Error  Failed to parse AI response.  Details: {{ $json.assessment }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1232,
+        -224
+      ],
+      "id": "36cf252a-71d6-48c2-8f94-0e699121a622",
+      "name": "Parse Error Alert",
+      "webhookId": "79f3627b-673b-40a7-b947-b63e960a59b7",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "restaurant_neolith_bot"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Get Inventory Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Inventory Data": {
+      "main": [
+        [
+          {
+            "node": "Update checked_at",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare AI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Inventory Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Inventory Analysis": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Alerts?": {
+      "main": [
+        [
+          {
+            "node": "Inventory Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "All OK Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inventory Alert": {
+      "main": [
+        [
+          {
+            "node": "Save to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Parse Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "All OK Alert": {
+      "main": [
+        [
+          {
+            "node": "Save OK Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Error?": {
+      "main": [
+        [
+          {
+            "node": "Parse Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Has Alerts?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "4a14b21b-1823-43e5-b317-7f4992d9d914",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_N8N_INSTANCE_ID"
+  },
+  "id": "ZoQup5z-R1am7sD6HEdxs",
+  "tags": []
+}

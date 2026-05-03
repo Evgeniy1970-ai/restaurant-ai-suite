@@ -1,0 +1,354 @@
+{
+  "name": "Restaurant AI Suite_2_Reservations_and_Reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "3b25d48b-1c70-43cc-995d-9a0470d2bba6",
+      "name": "Telegram Trigger",
+      "webhookId": "0dd74649-1dc2-424d-98c4-83e4f8e643b3",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "restaurant_neolith_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst triggerData = $('Telegram Trigger').first().json;\n\nconst chatId = triggerData.message.chat.id;\nconst text = (triggerData.message.text || '').trim();\nconst firstName = triggerData.message.from.first_name || 'Гость';\n\n// Читаем сессию из Supabase (Get Session node)\nlet step = 0;\nlet sessionData = {};\n\ntry {\n  const sessionRow = $('Get Session').first().json;\n  if (sessionRow && sessionRow.chat_id) {\n    step = sessionRow.step || 0;\n    sessionData = sessionRow.data || {};\n  }\n} catch(e) {\n  step = 0;\n  sessionData = {};\n}\n\nlet replyText = '';\nlet nextStep = step;\n\nif (text === '/start' || step === 0) {\n  replyText = `Привет, ${firstName}! 👋\\nДобро пожаловать в систему бронирования.\\n\\nКак вас зовут? (введите имя и фамилию)`;\n  nextStep = 1;\n\n} else if (step === 1) {\n  sessionData.guest_name = text;\n  replyText = `Отлично, ${text}! 📅\\nНа какую дату бронируем?\\n(формат: ДД.ММ.ГГГГ, например 25.05.2025)`;\n  nextStep = 2;\n\n} else if (step === 2) {\n  const dateRegex = /^(\\d{2})\\.(\\d{2})\\.(\\d{4})$/;\n  if (!dateRegex.test(text)) {\n    replyText = '❌ Неверный формат даты. Пожалуйста, введите дату в формате ДД.ММ.ГГГГ';\n    nextStep = 2;\n  } else {\n    const parts = text.split('.');\n    sessionData.reservation_date = `${parts[2]}-${parts[1]}-${parts[0]}`;\n    replyText = '⏰ На какое время?\\n(формат: ЧЧ:ММ, например 19:30)';\n    nextStep = 3;\n  }\n\n} else if (step === 3) {\n  const timeRegex = /^(\\d{2}):(\\d{2})$/;\n  if (!timeRegex.test(text)) {\n    replyText = '❌ Неверный формат времени. Пожалуйста, введите время в формате ЧЧ:ММ';\n    nextStep = 3;\n  } else {\n    sessionData.reservation_time = text;\n    replyText = '👥 Сколько гостей будет?';\n    nextStep = 4;\n  }\n\n} else if (step === 4) {\n  const count = parseInt(text);\n  if (isNaN(count) || count < 1 || count > 20) {\n    replyText = '❌ Пожалуйста, введите число от 1 до 20';\n    nextStep = 4;\n  } else {\n    sessionData.party_size = count;\n    replyText = '📧 Ваш email для подтверждения бронирования?';\n    nextStep = 5;\n  }\n\n} else if (step === 5) {\n  const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n  if (!emailRegex.test(text)) {\n    replyText = '❌ Неверный формат email. Попробуйте ещё раз';\n    nextStep = 5;\n  } else {\n    sessionData.guest_email = text;\n    replyText = '📱 Ваш номер телефона?';\n    nextStep = 6;\n  }\n\n} else if (step === 6) {\n  sessionData.guest_phone = text;\n  replyText = `✅ Проверьте данные:\\n\\n👤 ${sessionData.guest_name}\\n📅 ${sessionData.reservation_date}\\n⏰ ${sessionData.reservation_time}\\n👥 ${sessionData.party_size} гостей\\n📧 ${sessionData.guest_email}\\n📱 ${sessionData.guest_phone}\\n\\nПодтвердить? (да / нет)`;\n  nextStep = 7;\n\n} else if (step === 7) {\n  if (text.toLowerCase() === 'да') {\n    replyText = '⏳ Сохраняем вашу бронь...';\n    nextStep = 8;\n  } else {\n    replyText = '❌ Бронирование отменено. Напишите /start чтобы начать заново.';\n    nextStep = 0;\n    sessionData = {};\n  }\n}\n\nreturn [{\n  json: {\n    chatId,\n    replyText,\n    step: nextStep,\n    sessionData,\n    firstName,\n    readyToSave: nextStep === 8\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "58cd63e0-3580-4549-8a0f-8dbbd3e71e7a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Code in JavaScript').first().json.chatId }}",
+        "text": "={{ $('Code in JavaScript').first().json.replyText }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        832,
+        0
+      ],
+      "id": "ec66e79e-d19a-4409-a111-3e1004c49f22",
+      "name": "Send a text message",
+      "webhookId": "31e5a9ef-ceba-406a-851f-74e635566c10",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "restaurant_neolith_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://YOUR_SUPABASE_URL/rest/v1/bot_sessions?chat_id=eq.{{ $('Telegram Trigger').first().json.message.chat.id }}&select=*",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "924599af-9dc6-461e-b1da-5d1b481ad502",
+      "name": "Get Session",
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vwZcNVPc3cOf2pNu",
+          "name": "Serper_API"
+        },
+        "httpCustomAuth": {
+          "id": "YOUR_CUSTOM_AUTH_CREDENTIAL_ID",
+          "name": "Custom Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://YOUR_SUPABASE_URL/rest/v1/bot_sessions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \"chat_id\": $json.chatId, \"step\": $json.step, \"data\": $json.sessionData, \"updated_at\": new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        624,
+        0
+      ],
+      "id": "ce5763a2-c1f7-4bc4-9015-bb5462ea4b24",
+      "name": "Save Session",
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "YOUR_CUSTOM_AUTH_CREDENTIAL_ID",
+          "name": "Custom Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0829c569-0ff8-4f16-a8fa-e37232031faa",
+              "leftValue": "={{ $('Code in JavaScript').first().json.readyToSave }}",
+              "rightValue": "={{ true }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "9b443a80-e261-4280-bad1-4e0fc2c4d2fc",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "tableId": "reservations",
+        "dataToSend": "autoMapInputData",
+        "inputsToIgnore": "chatId, replyText, firstName, readyToSave"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        -160
+      ],
+      "id": "d4e6509d-579a-4b41-8fb7-c8a951441e30",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "restaurant-ai-suite"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Code in JavaScript').first().json.sessionData;\n\n// Конвертируем дату из формата ГГГГ-ММ-ДД (уже конвертирована в Code node)\nreturn [{\n  json: {\n    restaurant_id: 'e12f1eae-f48d-4c5f-ac9b-b9fd0f84e754',\n    guest_name: data.guest_name,\n    guest_email: data.guest_email,\n    guest_phone: data.guest_phone,\n    party_size: data.party_size,\n    reservation_date: data.reservation_date,\n    reservation_time: data.reservation_time,\n    status: 'confirmed',\n    source: 'telegram',\n    reminder_sent: false,\n    notes: '',\n    reserved_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -160
+      ],
+      "id": "9659d48a-c7a5-4507-918b-b0913dd2348f",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript1').first().json.guest_email }}",
+        "subject": "=Подтверждение бронирования — {{ $('Code in JavaScript1').first().json.reservation_date }}",
+        "message": "=<h2>Ваша бронь подтверждена! ✅</h2>\n<p>Уважаемый(ая) {{ $('Code in JavaScript1').first().json.guest_name }},</p>\n<p>Ваше бронирование успешно оформлено:</p>\n<ul>\n  <li>📅 Дата: {{ $('Code in JavaScript1').first().json.reservation_date }}</li>\n  <li>⏰ Время: {{ $('Code in JavaScript1').first().json.reservation_time }}</li>\n  <li>👥 Гостей: {{ $('Code in JavaScript1').first().json.party_size }}</li>\n</ul>\n<p>Ждём вас! До встречи в ресторане.</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1584,
+        -160
+      ],
+      "id": "62fa26b8-b138-4fbf-a6b3-7ebfad69d2a7",
+      "name": "Send a message",
+      "webhookId": "0fd9ce80-37bc-48e1-aade-3e3de1399ac0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🔔 Новая бронь!\\n\\n👤 {{ $('Code in JavaScript1').first().json.guest_name }}\\n📅 {{ $('Code in JavaScript1').first().json.reservation_date }}\\n⏰ {{ $('Code in JavaScript1').first().json.reservation_time }}\\n👥 {{ $('Code in JavaScript1').first().json.party_size }} гостей\\n📧 {{ $('Code in JavaScript1').first().json.guest_email }}\\n📱 {{ $('Code in JavaScript1').first().json.guest_phone }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1792,
+        -160
+      ],
+      "id": "fa1490f1-54e3-4eee-ab3b-7c3ab9eb716e",
+      "name": "Send a text message1",
+      "webhookId": "f075386f-9205-4bd8-8fae-15d144dbe257",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "restaurant_neolith_bot"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Save Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Session": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Session": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "04d6723a-a3b6-4453-816f-d189f3a07109",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_N8N_INSTANCE_ID"
+  },
+  "id": "0-SxL3ntFrJ6dZuymMBcL",
+  "tags": []
+}

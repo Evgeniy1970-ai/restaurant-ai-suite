@@ -1,0 +1,464 @@
+{
+  "name": "Restaurant AI Suite_1_Reputation & Sentiment",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-240, -80],
+      "id": "2d7fc1b6-4cce-4b41-b732-36d799bc10c4",
+      "name": "🕐 Every 6 Hours"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reputation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-240, 80],
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "🌐 Webhook Trigger",
+      "webhookId": "reputation-agent-webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', message: 'Agent 1 triggered', ts: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-240, 240],
+      "id": "a1b2c3d4-0002-0002-0002-000000000002",
+      "name": "✅ Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "url": "https://serpapi.com/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "engine", "value": "google_maps_reviews" },
+            { "name": "api_key", "value": "YOUR_SERPAPI_KEY" },
+            { "name": "place_id", "value": "ChIJEWbXz6ZZwokRLKmKrtPfVFY" }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [80, -200],
+      "id": "637eef3f-d563-40a8-a93a-488f9f831bd2",
+      "name": "🔍 Fetch Google Reviews",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://serpapi.com/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "engine", "value": "tripadvisor_reviews" },
+            { "name": "place_id", "value": "479020" },
+            { "name": "api_key", "value": "YOUR_SERPAPI_KEY" }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [80, 0],
+      "id": "afa1a123-5edb-4132-b2a3-0fbae6fffa85",
+      "name": "🔍 Fetch TripAdvisor Reviews",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://serpapi.com/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "engine", "value": "yelp_reviews" },
+            { "name": "place_id", "value": "eleven-madison-park-new-york-2" },
+            { "name": "api_key", "value": "YOUR_SERPAPI_KEY" },
+            { "name": "start", "value": "0" }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [80, 200],
+      "id": "15220226-09b4-4721-932a-86a9f9c02dd9",
+      "name": "🔍 Fetch Yelp Reviews",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tag each review with platform = 'google'\nconst reviews = $json.reviews || [];\nif (!reviews.length) return [];\nreturn reviews.map(r => ({ json: { ...r, platform: 'google' } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [320, -200],
+      "id": "a1b2c3d4-0003-0003-0003-000000000003",
+      "name": "🏷 Tag Google"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tag each review with platform = 'tripadvisor'\nconst reviews = $json.reviews || [];\nif (!reviews.length) return [];\nreturn reviews.map(r => ({ json: { ...r, platform: 'tripadvisor' } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [320, 0],
+      "id": "a1b2c3d4-0004-0004-0004-000000000004",
+      "name": "🏷 Tag TripAdvisor"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "71c8b7d4-144c-41c6-9114-acdc0b961244",
+              "leftValue": "={{ $json.search_information.reviews_results_state }}",
+              "rightValue": "Fully empty",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [320, 200],
+      "id": "302c06eb-4e50-4c7c-85d6-b356fb3cd819",
+      "name": "Yelp Available?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tag each review with platform = 'yelp'\nconst reviews = $json.reviews || [];\nif (!reviews.length) return [];\nreturn reviews.map(r => ({ json: { ...r, platform: 'yelp' } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [560, 160],
+      "id": "a1b2c3d4-0005-0005-0005-000000000005",
+      "name": "🏷 Tag Yelp"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Yelp is unavailable—returning an empty array\nreturn [];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [560, 280],
+      "id": "f64b1f9b-12cf-4ea6-ae49-2d95257d786f",
+      "name": "Yelp Fallback"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [780, -60],
+      "id": "0b93e907-340f-4374-a523-6d5acb861fd9",
+      "name": "🔀 Merge All Reviews"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "reviews",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1000, -60],
+      "id": "3f87b785-a750-4fea-b699-9612bf816172",
+      "name": "✂️ Split Reviews"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Analyze the following restaurant review and respond ONLY with a valid JSON object, no other text.\n\nReview: {{ $json.snippet }}\nRating: {{ $json.rating }}/5\n\nReturn exactly this JSON structure:\n{\n  \"sentiment\": \"positive\" or \"neutral\" or \"negative\",\n  \"sentiment_score\": a number from 0.0 to 1.0,\n  \"summary\": \"one sentence summary in English\",\n  \"key_topics\": [\"topic1\", \"topic2\"]\n}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [1220, -60],
+      "id": "4e0e72b8-ad92-427a-91e4-947548a57343",
+      "name": "🤖 AI Sentiment Analysis",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\nfor (const item of $input.all()) {\n  const aiText = item.json.output[0].content[0].text;\n\n  let parsed;\n  try {\n    // Strip markdown code fences if present\n    const clean = aiText.replace(/```json|```/g, '').trim();\n    parsed = JSON.parse(clean);\n  } catch (e) {\n    parsed = {\n      sentiment: 'neutral',\n      sentiment_score: 0.5,\n      summary: 'Could not parse AI response',\n      key_topics: []\n    };\n  }\n\n  const platform = item.json.platform || 'google';\n  const externalId = item.json.review_id ? item.json.review_id.toString() : null;\n\n  results.push({\n    json: {\n      restaurant_id: 'e12f1eae-f48d-4c5f-ac9b-b9fd0f84e754',\n      platform: platform,\n      external_id: externalId,\n      rating: item.json.rating || null,\n      content: item.json.snippet || null,\n      sentiment: parsed.sentiment,\n      sentiment_score: parsed.sentiment_score,\n      ai_analysis: {\n        summary: parsed.summary,\n        key_topics: parsed.key_topics\n      },\n      review_date: item.json.iso_date || item.json.date || null\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, -60],
+      "id": "c79f8018-7f78-4376-bfbe-f1951d94674c",
+      "name": "🔧 Parse AI Response"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "tableId": "reviews",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "restaurant_id", "fieldValue": "={{ $json.restaurant_id }}" },
+            { "fieldId": "platform", "fieldValue": "={{ $json.platform }}" },
+            { "fieldId": "external_id", "fieldValue": "={{ $json.external_id }}" },
+            { "fieldId": "rating", "fieldValue": "={{ $json.rating }}" },
+            { "fieldId": "content", "fieldValue": "={{ $json.content }}" },
+            { "fieldId": "sentiment", "fieldValue": "={{ $json.sentiment }}" },
+            { "fieldId": "sentiment_score", "fieldValue": "={{ $json.sentiment_score }}" },
+            { "fieldId": "ai_analysis", "fieldValue": "={{ JSON.stringify($json.ai_analysis) }}" },
+            { "fieldId": "review_date", "fieldValue": "={{ $json.review_date }}" }
+          ]
+        },
+        "conflictColumns": "external_id"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1660, -60],
+      "id": "df7e159f-b5ef-4df9-8e4f-505af23e6539",
+      "name": "💾 Upsert to Supabase",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "restaurant-ai-suite"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Count successfully saved reviews\nconst count = $input.all().length;\nreturn [{ json: { count } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1880, -160],
+      "id": "a1b2c3d4-0006-0006-0006-000000000006",
+      "name": "📊 Count Results"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_CHAT_ID",
+        "text": "=✅ *Agent 1 — Reputation Manager*\n\nJob completed successfully!\n\n📊 Reviews processed: *{{ $json.count }}*\n🕐 Time: {{ new Date().toLocaleString('en-GB', {timeZone: 'Europe/Warsaw'}) }}\n🏪 Restaurant ID: `e12f1eae-f48d-4c5f-ac9b-b9fd0f84e754`",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2100, -160],
+      "id": "a1b2c3d4-0007-0007-0007-000000000007",
+      "name": "✅ Success Notification",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect error details from failed node\nconst error = $input.first()?.json?.error || {};\nreturn [{\n  json: {\n    agent: 'Agent 1 — Reputation & Sentiment',\n    node: $input.first()?.json?.node || 'Unknown node',\n    error_message: error.message || JSON.stringify(error) || 'Unknown error',\n    restaurant_id: 'e12f1eae-f48d-4c5f-ac9b-b9fd0f84e754',\n    ts: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1880, 100],
+      "id": "a1b2c3d4-0008-0008-0008-000000000008",
+      "name": "🔴 Prepare Error Data"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "error_logs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "restaurant_id", "fieldValue": "={{ $json.restaurant_id }}" },
+            { "fieldId": "agent_name", "fieldValue": "={{ $json.agent }}" },
+            { "fieldId": "node_name", "fieldValue": "={{ $json.node }}" },
+            { "fieldId": "error_message", "fieldValue": "={{ $json.error_message }}" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [2100, 100],
+      "id": "a1b2c3d4-0009-0009-0009-000000000009",
+      "name": "💾 Log Error to Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "restaurant-ai-suite"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_CHAT_ID",
+        "text": "=🚨 *Agent 1 — Reputation Manager*\n\nError detected!\n\n❌ Node: *{{ $json.node }}*\n📛 Error: `{{ $json.error_message }}`\n🕐 Time: {{ new Date().toLocaleString('en-GB', {timeZone: 'Europe/Warsaw'}) }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2320, 100],
+      "id": "a1b2c3d4-0010-0010-0010-000000000010",
+      "name": "🚨 Error Notification",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "🕐 Every 6 Hours": {
+      "main": [[
+        { "node": "🔍 Fetch Google Reviews", "type": "main", "index": 0 },
+        { "node": "🔍 Fetch TripAdvisor Reviews", "type": "main", "index": 0 },
+        { "node": "🔍 Fetch Yelp Reviews", "type": "main", "index": 0 }
+      ]]
+    },
+    "🌐 Webhook Trigger": {
+      "main": [[
+        { "node": "✅ Respond to Webhook", "type": "main", "index": 0 },
+        { "node": "🔍 Fetch Google Reviews", "type": "main", "index": 0 },
+        { "node": "🔍 Fetch TripAdvisor Reviews", "type": "main", "index": 0 },
+        { "node": "🔍 Fetch Yelp Reviews", "type": "main", "index": 0 }
+      ]]
+    },
+    "🔍 Fetch Google Reviews": {
+      "main": [
+        [{ "node": "🏷 Tag Google", "type": "main", "index": 0 }],
+        [{ "node": "🔴 Prepare Error Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "🔍 Fetch TripAdvisor Reviews": {
+      "main": [
+        [{ "node": "🏷 Tag TripAdvisor", "type": "main", "index": 0 }],
+        [{ "node": "🔴 Prepare Error Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "🔍 Fetch Yelp Reviews": {
+      "main": [
+        [{ "node": "Yelp Available?", "type": "main", "index": 0 }],
+        [{ "node": "🔴 Prepare Error Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "🏷 Tag Google": {
+      "main": [[{ "node": "🔀 Merge All Reviews", "type": "main", "index": 0 }]]
+    },
+    "🏷 Tag TripAdvisor": {
+      "main": [[{ "node": "🔀 Merge All Reviews", "type": "main", "index": 1 }]]
+    },
+    "Yelp Available?": {
+      "main": [
+        [{ "node": "🏷 Tag Yelp", "type": "main", "index": 0 }],
+        [{ "node": "Yelp Fallback", "type": "main", "index": 0 }]
+      ]
+    },
+    "🏷 Tag Yelp": {
+      "main": [[{ "node": "🔀 Merge All Reviews", "type": "main", "index": 2 }]]
+    },
+    "Yelp Fallback": {
+      "main": [[{ "node": "🔀 Merge All Reviews", "type": "main", "index": 2 }]]
+    },
+    "🔀 Merge All Reviews": {
+      "main": [[{ "node": "✂️ Split Reviews", "type": "main", "index": 0 }]]
+    },
+    "✂️ Split Reviews": {
+      "main": [[{ "node": "🤖 AI Sentiment Analysis", "type": "main", "index": 0 }]]
+    },
+    "🤖 AI Sentiment Analysis": {
+      "main": [
+        [{ "node": "🔧 Parse AI Response", "type": "main", "index": 0 }],
+        [{ "node": "🔴 Prepare Error Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "🔧 Parse AI Response": {
+      "main": [[{ "node": "💾 Upsert to Supabase", "type": "main", "index": 0 }]]
+    },
+    "💾 Upsert to Supabase": {
+      "main": [
+        [{ "node": "📊 Count Results", "type": "main", "index": 0 }],
+        [{ "node": "🔴 Prepare Error Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "📊 Count Results": {
+      "main": [[{ "node": "✅ Success Notification", "type": "main", "index": 0 }]]
+    },
+    "🔴 Prepare Error Data": {
+      "main": [[{ "node": "💾 Log Error to Supabase", "type": "main", "index": 0 }]]
+    },
+    "💾 Log Error to Supabase": {
+      "main": [[{ "node": "🚨 Error Notification", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "0e923e45-46b9-4f35-82ba-7808bcef4926",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_N8N_INSTANCE_ID"
+  },
+  "id": "r3d-ZR0-pEehsfXPCqlQQ",
+  "tags": []
+}

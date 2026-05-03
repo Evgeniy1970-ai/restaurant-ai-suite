@@ -1,0 +1,670 @@
+{
+  "name": "Restaurant AI Suite: Agent 5 — AI Menu Photographer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agent5-photo",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fdb6601a-5f3b-4638-bd39-b5593a6adcdd",
+      "name": "Webhook",
+      "webhookId": "282688b7-35e1-4145-8cd7-456a5482effb"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.mode }}",
+                    "rightValue": "analyze",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "4c773551-6fd3-4a01-8d5c-7e10c617a72e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "analyze"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "069c4a76-d797-43dd-8335-420bed68f85b",
+                    "leftValue": "={{ $json.body.mode }}",
+                    "rightValue": "generate",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "generate"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "e20945d4-3cb0-4caf-85f9-fd0b8b8832fe",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "tableId": "photos",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "restaurant_id",
+              "fieldValue": "={{ $json.body.restaurant_id }}"
+            },
+            {
+              "fieldId": "mode",
+              "fieldValue": "analyze"
+            },
+            {
+              "fieldId": "url",
+              "fieldValue": "={{ $json.body.photo_url }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "processing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        416,
+        -96
+      ],
+      "id": "bb7a9ba6-1204-404e-9162-ef18ae2fd24c",
+      "name": "Supabase: INSERT analyze",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "restaurant-ai-suite"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "id"
+        },
+        "text": "You are a professional food photographer and culinary critic. Analyze this dish photo and provide a structured evaluation in JSON format only, no other text.\n\nReturn this exact JSON structure:\n{\n  \"quality_score\": <number 1-10>,\n  \"lighting\": {\"score\": <1-10>, \"comment\": \"<brief note>\"},\n  \"composition\": {\"score\": <1-10>, \"comment\": \"<brief note>\"},\n  \"appetizing\": {\"score\": <1-10>, \"comment\": \"<brief note>\"},\n  \"background\": {\"score\": <1-10>, \"comment\": \"<brief note>\"},\n  \"recommendations\": [\"<tip 1>\", \"<tip 2>\", \"<tip 3>\"],\n  \"summary\": \"<2-3 sentence overall assessment>\"\nIMPORTANT: Return ONLY the raw JSON object. No markdown, no code blocks, no backticks. Start your response with { and end with }\n}",
+        "imageUrls": "={{ $('Webhook').item.json.body.image_url }}",
+        "simplify": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        -96
+      ],
+      "id": "63dc4184-a182-45fd-8282-a5dc4c194152",
+      "name": "GPT-4o Vision: analyze",
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "photos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Supabase: INSERT analyze').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "analysis_result",
+              "fieldValue": "={{ $json.analysis }}"
+            },
+            {
+              "fieldId": "quality_score",
+              "fieldValue": "={{ $json.quality_score }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "done"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        -96
+      ],
+      "id": "047c8ab6-e7c8-4790-aff9-c11ceff87cc4",
+      "name": "Supabase: UPDATE analyze",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "restaurant-ai-suite"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"mode\": \"analyze\",\n  \"photo_id\": \"{{ $('Supabase: INSERT analyze').item.json.id }}\",\n  \"quality_score\": \"{{ $('Supabase: UPDATE analyze').item.json.quality_score }}\",\n  \"analysis\": {{ JSON.stringify($('Supabase: UPDATE analyze').item.json.analysis_result) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1248,
+        -96
+      ],
+      "id": "3bf6c528-c1e8-4bd7-a6cd-17e0790f203a",
+      "name": "Response: analyze"
+    },
+    {
+      "parameters": {
+        "tableId": "photos",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "=restaurant_id",
+              "fieldValue": "={{ $json.body.restaurant_id }}"
+            },
+            {
+              "fieldId": "mode",
+              "fieldValue": "generate"
+            },
+            {
+              "fieldId": "ai_caption",
+              "fieldValue": "={{ $json.body.dish_name }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "processing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        416,
+        96
+      ],
+      "id": "bc424f2e-8a74-4714-9d66-81a44d399240",
+      "name": "Supabase: INSERT generate",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "restaurant-ai-suite"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=You are a professional food photographer. Create a detailed DALL-E 3 prompt for a professional menu photo of this dish.\n\nDish name: {{ $json.body.dish_name }}\nDish description: {{ $json.body.dish_description }}\n\nReturn ONLY the DALL-E prompt text, nothing else. The prompt should describe:\n- The dish's appearance, colors, textures\n- Professional food photography lighting (soft, natural)\n- Camera angle (45 degrees overhead or close-up)\n- Background (clean, minimal, restaurant-appropriate)\n- Style (appetizing, high-end restaurant menu photo)\n\nExample format: \"A beautifully plated [dish], [colors and textures], soft natural lighting, 45-degree angle, minimal white background, professional food photography, appetizing, high resolution\""
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        96
+      ],
+      "id": "c2efff79-09a2-4869-8602-6b15962e8a50",
+      "name": "GPT-4o: generate prompt",
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "prompt": "={{ $json.output[0].content[0].text }}",
+        "options": {
+          "dalleQuality": "hd",
+          "size": "1024x1024"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1184,
+        96
+      ],
+      "id": "6f03d7b4-e4f9-42c0-9a3c-6a7fdeb7b1e0",
+      "name": "DALL-E 3: generate image",
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "photos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Supabase: INSERT generate').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "generated_prompt",
+              "fieldValue": "={{ $('GPT-4o: generate prompt').item.json.output[0].content[0].text }}"
+            },
+            {
+              "fieldId": "url",
+              "fieldValue": "={{ 'https://YOUR_SUPABASE_URL/storage/v1/object/public/' + $('Supabase Storage: upload').item.json.Key }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "done"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        96
+      ],
+      "id": "1f688ccb-aeae-41dc-9a51-facdfe5b993e",
+      "name": "Supabase: UPDATE generate",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "restaurant-ai-suite"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"mode\": \"generate\",\n  \"photo_id\": \"{{ $('Supabase: INSERT generate').item.json.id }}\",\n  \"image_url\": \"{{ 'https://YOUR_SUPABASE_URL/storage/v1/object/public/' + $('Supabase Storage: upload').item.json.Key }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1808,
+        96
+      ],
+      "id": "53211ef5-2b08-4f1c-a67a-da4582713069",
+      "name": "Response: generate"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://YOUR_SUPABASE_URL/storage/v1/object/menu-photos/{{ $now.toFormat('yyyy-MM-dd') }}/{{ $('Supabase: INSERT generate').item.json.id }}.png",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "image/png"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1392,
+        96
+      ],
+      "id": "12b9dc7c-5a51-442f-815f-073f5bfcf8eb",
+      "name": "Supabase Storage: upload",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_SUPABASE_STORAGE_CREDENTIAL_ID",
+          "name": "Supabase-Storage"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=📸 New Photo Analyzed  Quality Score: {{ $('Supabase: UPDATE analyze').item.json.quality_score }}/10 Photo ID: {{ $('Supabase: INSERT analyze').item.json.id }} Restaurant: Eleven Madison Park",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1456,
+        -96
+      ],
+      "id": "0b1aca98-633e-4632-b776-21fc97336ceb",
+      "name": "Telegram: analyze",
+      "webhookId": "3b00372d-cd7b-4ce8-b0aa-28ecb99086ef",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "restaurant_neolith_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🎨 New Photo Generated  Dish: {{ $('Supabase: INSERT generate').item.json.ai_caption }} Photo ID: {{ $('Supabase: INSERT generate').item.json.id }} Image URL: {{ 'https://YOUR_SUPABASE_URL/storage/v1/object/public/' + $('Supabase Storage: upload').item.json.Key }} Restaurant: Eleven Madison Park",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2016,
+        96
+      ],
+      "id": "9f74f972-1e9b-45ed-91ab-b2bc8eda70dc",
+      "name": "Telegram: generate",
+      "webhookId": "f55bdd68-cbee-4e5b-b032-814ef038b4cd",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "restaurant_neolith_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get raw text from GPT-4o Vision response\nconst raw = $input.first().json.output[0].content[0].text;\n\n// Clean possible markdown fences\nconst cleaned = raw.replace(/```json|```/g, '').trim();\n\n// Try to parse JSON safely\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch(e) {\n  // If parsing fails — return error object\n  return [{\n    json: {\n      parse_error: true,\n      error_message: e.message,\n      raw_response: cleaned,\n      quality_score: 0,\n      summary: 'Failed to parse AI response'\n    }\n  }];\n}\n\n// Return parsed result\nreturn [{\n  json: {\n    parse_error: false,\n    quality_score: parsed.quality_score,\n    analysis: parsed,\n    raw_text: cleaned\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        -96
+      ],
+      "id": "92be29b7-3e13-44da-b8c4-4d03a9ad415a",
+      "name": "Parse Vision Response"
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "YOUR_NGROK_URL",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+            "content-length": "151",
+            "accept": "*/*",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "en-US,en;q=0.9,pl;q=0.8,uk;q=0.7,ru;q=0.6",
+            "content-type": "application/json",
+            "origin": "https://YOUR_NETLIFY_URL",
+            "priority": "u=1, i",
+            "referer": "https://YOUR_NETLIFY_URL/",
+            "sec-ch-ua": "\"Google Chrome\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "x-forwarded-for": "2a02:a31b:2ae:1480:cc73:be27:a940:74d7",
+            "x-forwarded-host": "YOUR_NGROK_URL",
+            "x-forwarded-proto": "https"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "mode": "analyze",
+            "restaurant_id": "e12f1eae-f48d-4c5f-ac9b-b9fd0f84e754",
+            "image_url": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800"
+          },
+          "webhookUrl": "https://YOUR_NGROK_URL/webhook/agent5-photo",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Supabase: INSERT analyze",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase: INSERT generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: INSERT analyze": {
+      "main": [
+        [
+          {
+            "node": "GPT-4o Vision: analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4o Vision: analyze": {
+      "main": [
+        [
+          {
+            "node": "Parse Vision Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: UPDATE analyze": {
+      "main": [
+        [
+          {
+            "node": "Response: analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: INSERT generate": {
+      "main": [
+        [
+          {
+            "node": "GPT-4o: generate prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4o: generate prompt": {
+      "main": [
+        [
+          {
+            "node": "DALL-E 3: generate image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DALL-E 3: generate image": {
+      "main": [
+        [
+          {
+            "node": "Supabase Storage: upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: UPDATE generate": {
+      "main": [
+        [
+          {
+            "node": "Response: generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Storage: upload": {
+      "main": [
+        [
+          {
+            "node": "Supabase: UPDATE generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response: analyze": {
+      "main": [
+        [
+          {
+            "node": "Telegram: analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response: generate": {
+      "main": [
+        [
+          {
+            "node": "Telegram: generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Vision Response": {
+      "main": [
+        [
+          {
+            "node": "Supabase: UPDATE analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "51f9f54c-b562-45f1-993c-774794039a4c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_N8N_INSTANCE_ID"
+  },
+  "id": "WEN82puHSOtmmnCu926My",
+  "tags": []
+}
