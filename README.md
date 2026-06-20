@@ -140,7 +140,7 @@ A lightweight HTML/JS control panel hosted on Netlify. No frameworks, no build s
 - Manual trigger buttons for each agent
 - Settings panel (Supabase connection, webhook URLs)
 
-**Demo:** [neolithai.netlify.app](https://neolithai.netlify.app)
+**Demo:** [[[neolithai.netlify.app](https://neolithai.netlify.app)](https://fancy-figolla-504d1b.netlify.app/)](https://fancy-figolla-504d1b.netlify.app/)
 
 ---
 
